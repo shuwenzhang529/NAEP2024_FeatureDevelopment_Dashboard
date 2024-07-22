@@ -23,7 +23,7 @@ import correlation_coefficient, titlerenderer
 """
 Read in datafiles, will change to read directly from S3
 """
-path = r'C:\Users\SZHANG\OneDrive - Educational Testing Service\Desktop\FeatureDev_2024'
+path = '../data/'
 filenames = listdir(path)
 files=[path+'/'+f for f in filenames if f.endswith('.csv') ]
 
