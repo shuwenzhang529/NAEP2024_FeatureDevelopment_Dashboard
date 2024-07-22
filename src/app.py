@@ -4,6 +4,7 @@ import dependencies
 import numpy as np
 import pandas as pd
 from os import listdir
+import glob
 
 import dash
 import dash_bootstrap_components as dbc
@@ -24,10 +25,11 @@ import correlation_coefficient, titlerenderer
 Read in datafiles, will change to read directly from S3
 """
 path = '../data/'
-filenames = listdir(path)
-files=[path+'/'+f for f in filenames if f.endswith('.csv') ]
+filenames = glob.glob(path + '*')
+# filenames = listdir(path)
+# files=[path+'/'+f for f in filenames if f.endswith('.csv') ]
 
-df_ori=pd.concat([pd.read_csv(f) for f in files]).reset_index(drop=True)
+df_ori=pd.concat([pd.read_csv(f) for f in filenames]).reset_index(drop=True)
 # print(np.shape(df_ori))
 
 df=df_ori.drop([
