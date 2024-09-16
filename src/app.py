@@ -24,13 +24,13 @@ import correlation_coefficient, titlerenderer
 """
 Read in datafiles, will change to read directly from S3
 """
-path = '../data/'
-filenames = glob.glob(path + '*')
+# path = '../data/'
+# filenames = glob.glob(path + '*')
 # filenames = listdir(path)
 # files=[path+'/'+f for f in filenames if f.endswith('.csv') ]
 
-df_ori=pd.concat([pd.read_csv(f) for f in filenames]).reset_index(drop=True)
-# print(np.shape(df_ori))
+# df_ori=pd.concat([pd.read_csv(f) for f in filenames]).reset_index(drop=True)
+df_ori = pd.read_csv("../data/all.csv")
 
 df=df_ori.drop([
     'subject','grade','blockContent','language','accommodation','context_accession_number.1',
