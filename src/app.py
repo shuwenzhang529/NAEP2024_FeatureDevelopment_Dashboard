@@ -4,7 +4,6 @@ import dependencies
 import numpy as np
 import pandas as pd
 from os import listdir
-import glob
 
 import dash
 import dash_bootstrap_components as dbc
@@ -19,25 +18,18 @@ warnings.filterwarnings("ignore")
 
 import sys
 sys.path.append('./functions/')
-import correlation_coefficient, titlerenderer
+import correlation_coefficient
 
 """
 Read in datafiles, will change to read directly from S3
 """
-# path = '../data/'
-# filenames = glob.glob(path + '*')
-# filenames = listdir(path)
-# files=[path+'/'+f for f in filenames if f.endswith('.csv') ]
+path = r'C:\Users\SZHANG\OneDrive - Educational Testing Service\Desktop\FeatureDev_2024'
+filenames = listdir(path)
+files=[path+'/'+f for f in filenames if f.endswith('.csv') ]
 
-# df_ori=pd.concat([pd.read_csv(f) for f in filenames]).reset_index(drop=True)
-df_ori = pd.read_csv("../data/all.csv")
-
-df=df_ori.drop([
-    'subject','grade','blockContent','language','accommodation','context_accession_number.1',
-    'n_enter_screen','n_exit_screen','n_enter_block','n_exit_block','n_enter_item','n_exit_item',
-    'n_enter_assessment',
-    ],axis=1,errors='ignore')
+df=pd.concat([pd.read_csv(f) for f in files]).reset_index(drop=True)
 # print(np.shape(df))
+
 df_nobool=df[[col for col in df.columns if 'bool' not in col]]
 # print(np.shape(df_nobool))
 
@@ -46,116 +38,198 @@ columns_to_change=[
     'act_seq_acc','act_seq_bc']
 for c in columns_to_change:
     df_nobool[c]=df_nobool[c].astype('category')
-    
-df_nobool_numerics = df_nobool.select_dtypes(include=np.number)
-# print(np.shape(df_nobool_numerics))
-threshold=0.8
-threshold_column='Correlation Coefficient>'+str(threshold)
-df_top_corr=correlation_coefficient.get_top_correlations_blog(df_nobool_numerics, threshold=threshold)
-# print(df_top_corr.head())
+
+df_nobool_hist= df_nobool[['context_block_code', 'modality']]
+
+df_nobool_scatter = df_nobool.select_dtypes(include=np.number)
+# print(np.shape(df_nobool_scatter))
+threshold=0.3
+df_corr=correlation_coefficient.get_top_correlations_blog(df_nobool_scatter, threshold=threshold)
+df_corr["feature_pairs"] = df_corr["Feature1"] +" & "+ df_corr["Feature2"]
+
+corr_range=[0.3,0.5,0.8,1.0]  
+corr_range_str=['('+str(corr_range[i])+','+str(corr_range[i+1])+']'
+                for i in range(len(corr_range)-1)]
+
+df_corr['correlation_range']=pd.cut(df_corr.iloc[:,2], bins=corr_range, labels=corr_range_str)
+df_corr=df_corr.sort_values(df_corr.columns[2],ascending=False)
+
 
 """
 Start plotting 
 """
-subject_list=['Select a Profile Report for Subject: All','Reading','Math','Science']
-
-
-app = Dash(__name__,title="Naep2024FeatureDevelopment", external_stylesheets=['./assets/style.css'])
+app = Dash(__name__,title="Naep2024FeatureDevelopment", 
+           external_stylesheets=['./assets/style.css',dbc.themes.SANDSTONE])
 server = app.server
 
 app.layout = html.Div(
     children=[
         html.H1(
-        children="2024 NAEP Feature Developments",
-        style ={'color':'#000000','font-family':'Arial',
-                'font-size':'36px','font-weight':'bold',
-                'text-align':'center'},
+        children="NAEP Feature Developments - 2024",
+        className='title',
         ),
-
+        
         html.Div([
-            
-            ### Graph container
+            ### Left Histogram Graph container
             html.Div([
                 dcc.Dropdown(
-                    id='profile',
-                    options=subject_list,
-                    value=subject_list[0],
-                    clearable=False,
-                    style ={'background-color':'#d1d1d9','font-size':'20px','font-weight':'bold','height':'40px'},
+                    id='histogram',
+                    options=df_nobool_hist.columns,
+                    value=None,
+                    placeholder='Select Feature',
+                    style ={
+                            'font-size':'20px',
+                            'height':'40px'},
                     ),
-                    html.Div(id='profile_input'),
-                    ],   
-                    style ={'width':'50%','display':'inline-block',
-                            'margin-left':'20px','margin-top': 10,}
-                    ),
-            
-            ### Table container
-            html.Div([
-                dash_table.DataTable(
-                    id='correlation_table',
-                    columns= [{"name": i, "id": i} for i in df_top_corr.columns],
-                    data=df_top_corr.to_dict('records'),
-                    ### Table Styling
-                    style_table={'margin-top': 10},
-                    style_header={'backgroundColor': 'rgb(30, 30, 30)','color':'white','whiteSpace':'normal'},
-                    style_data={'backgroundColor': '#d1d1d9',},        
-                    style_cell={'font-size':'18px','textAlign': 'center'},
-                    style_cell_conditional=[{'if':{'column_id':threshold_column},'width':'25%'},],
-                    ### DataTable Interactivity
-                    row_selectable='single',
-                    editable=False,
-                    ),
-                    ], style ={'width':'44%','display':'inline-block',
-                               'margin-left':'30px'}
-                    ),
-            html.Div(id='display_selected_row'),
+                    dcc.Graph(id='histogram-plot',
+                              style={'width':'100%',
+                                  'margin-top':'20px',
+                                  'display':'inline-block',})
+                    ], style ={'width':'48%',
+                               'display':'inline-block',
+                               'margin-left':'10px',
+                               'margin-right':'10px',
+                               'margin-top':'20px',}
+                    ),           
         
-        ], style={'display': 'flex'},
-        ) ,     
-        ],)
-
-
+            ### Right Scatter Graph container
+            html.Div([
+                
+                dbc.Container([
+                dbc.Row([
+                    dbc.Col(    
+                    dcc.Dropdown(
+                    id='correlation-range-dropdown',
+                    options=[{'label': i, 'value': i} for i in df_corr.iloc[:,4].unique()],
+                    value=None, 
+                    placeholder='Select Correlation Range',
+                    style ={
+                        'font-size':'20px',
+                        'height':'40px',
+                        'margin-right':'-20px',
+                        }, 
+                    ), width=4,
+                ),
+                
+                    dbc.Col(  
+                    dcc.Dropdown(
+                    id='feature-pairs-dropdown',
+                    placeholder='Select Feature Pairs',
+                    optionHeight=60,
+                    style ={
+                        'font-size':'20px',
+                        'height':'40px',
+                        'margin-right':'-20px',
+                        },
+                    ), width=8,
+                )
+                ])
+                ]),
+                
+                   
+                dcc.Graph(
+                    id='graph',
+                    style={
+                        'width':'100%',
+                        'margin-left':'10px',
+                        'margin-right':'10px',
+                        'margin-top':'20px',
+                        'display':'inline-block',
+                        }
+                    ),
+                ],
+                     style ={'width':'48%',
+                             'display':'inline-block',
+                             'margin-left':'10px',
+                             'margin-right':'10px',
+                             'margin-top':'20px',
+                             }
+                     ) 
+            ],
+                 style={'display': 'flex'},
+        ),
+    ],)
+   
+    
+"""
+Call back histogram
+"""
 @app.callback(
-    Output('profile_input', 'children'), 
-    [Input('profile', 'value')]
-    )
+    Output('histogram-plot', 'figure'),
+    [Input('histogram', 'value')]
+)
 
-def update_profile(value):
-    if not value: return []
-    subjects= {'Select a Profile Report for Subject: All':'All',
-               'Reading':'RE','Math':'MA','Science':'SC'}
-    return html.Iframe(
-        src="assets/Profile_Report_"+subjects[value]+"_NoBoolean.html",
-        style={"height":"600px",'width':'100%','border':'2px solid grey'}
+def update_graph(col):
+    if col is None:
+        # fig = px.histogram(df_nobool_hist, x="context_block_code")
+        # title="context_block_code"
+        fig = go.Figure(
+            go.Histogram(x=pd.Series(dtype=object), y=pd.Series(dtype=object))
             )
+        fig.update_layout(
+        title={'text':"Select Feature for Histogram",'x':0.5,},
+        font=dict(size=14),
+        paper_bgcolor="LightSteelBlue",
+        ) 
+        
+    else:
+        fig = px.histogram(df_nobool_hist, x=col)  
+        title=col
+
+    fig.update_layout(
+        bargap=0.2,
+        xaxis_title="",
+        font=dict(size=16),
+        paper_bgcolor="LightSteelBlue",
+        ) 
+    return fig
+
+
+"""
+Call back scatter
+"""
 
 @app.callback(
-    output=Output('display_selected_row', "children"),
-    inputs=[Input('correlation_table', "selected_rows")],
-    state=[State('correlation_table', "data")],
-    prevent_initial_call=True)
+    Output('feature-pairs-dropdown', 'options'),
+    Input('correlation-range-dropdown', 'value')
+)
 
-def update_graph(selected_rows, rows):
-    
-    if len(selected_rows)!=0:
-        dff=pd.DataFrame(rows)
-        ftr1=dff.iloc[selected_rows,0].values[0]
-        ftr2=dff.iloc[selected_rows,1].values[0]
-        r2=dff.iloc[selected_rows,2].values[0]
-        fig = px.scatter(df_nobool_numerics, x=ftr1, y=ftr2,trendline="ols")
-        fig.update_traces(marker=dict(size=8,line=dict(width=1,color='DarkSlateGrey')),
-                  selector=dict(mode='markers'))
+def update_correlation_range_dropdown(selected_range):
+    filtered_df = df_corr[df_corr.iloc[:,4] == selected_range]
+    return [{'label': i, 'value': i} for i in filtered_df.iloc[:,3].tolist()]
+
+@app.callback(
+    Output('graph', 'figure'),
+    [Input('correlation-range-dropdown', 'value'),
+     Input('feature-pairs-dropdown', 'value')]
+)
+
+def update_graph(selected_range, selected_feature_pairs):
+    if selected_range is None or selected_feature_pairs is None:
+        fig = go.Figure(
+            go.Scatter(x=pd.Series(dtype=object), y=pd.Series(dtype=object), mode="markers")
+            )
         fig.update_layout(
-            title={
-                'text':"Pearson Correlation Coefficient ="+str(r2),
-                'x':0.5,},
-            font=dict(size=16),autosize=False, width=650, height=600,paper_bgcolor="LightSteelBlue",)
-        return fig.show(renderer="titleBrowser", browser_tab_title=ftr1+' vs '+ftr2)
+        title={'text':"Select Correlation Coefficient Range and Feature Pairs",'x':0.5,},
+        font=dict(size=14),
+        paper_bgcolor="LightSteelBlue",
+        )     
+    elif selected_feature_pairs is not None:  
+        feature1= selected_feature_pairs.replace(' ','').split('&')[0]
+        feature2= selected_feature_pairs.replace(' ','').split('&')[1]
+        
+        fig = px.scatter(df_nobool_scatter, 
+                     x=feature1, y=feature2, trendline="ols",)  
+        corr_coef = np.round(df_nobool_scatter[feature1].corr(df_nobool_scatter[feature2]), 3)
+        fig.update_traces(marker=dict(size=8),selector=dict(mode='markers'))
+        fig.update_layout(
+        title={'text':" Pearson Correlation Coefficient ="+str(corr_coef),'x':0.5,},
+        font=dict(size=14),
+        paper_bgcolor="LightSteelBlue",
+        )       
+    return fig        
     
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     app.run_server(debug=True)
-    ### Open terminal and run python app.py
-    
-
 

@@ -29,5 +29,5 @@ def get_top_correlations_blog(df, threshold):
             pairs.add((index[0], index[1]))
             i+=1
     
-    result.iloc[:,2]=result.iloc[:,2].apply(lambda x: round(x, 3))
+    result.iloc[:,2]=result.iloc[:,2].apply(lambda x: round(x, 5))
     return result#.reset_index(drop=True).set_index(['Variable 1', 'Variable 2'])
