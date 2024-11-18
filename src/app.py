@@ -161,8 +161,6 @@ Call back histogram
 
 def update_graph(col):
     if col is None:
-        # fig = px.histogram(df_nobool_hist, x="context_block_code")
-        # title="context_block_code"
         fig = go.Figure(
             go.Histogram(x=pd.Series(dtype=object), y=pd.Series(dtype=object))
             )
