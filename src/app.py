@@ -23,12 +23,12 @@ import correlation_coefficient
 """
 Read in datafiles, will change to read directly from S3
 """
-path = r'C:\Users\SZHANG\OneDrive - Educational Testing Service\Desktop\FeatureDev_2024'
+path = r'../data/'
 filenames = listdir(path)
 files=[path+'/'+f for f in filenames if f.endswith('.csv') ]
 
 df=pd.concat([pd.read_csv(f) for f in files]).reset_index(drop=True)
-# print(np.shape(df))
+# print(np.shape(df)
 
 df_nobool=df[[col for col in df.columns if 'bool' not in col]]
 # print(np.shape(df_nobool))
